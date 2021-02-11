@@ -35,6 +35,7 @@ const login = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
     const errors: any = {};
+
     if (isEmpty(username)) errors.username = "Username can not be empty";
     if (isEmpty(password)) errors.password = "Password can not be empty";
 
@@ -47,18 +48,45 @@ const login = async (req: Request, res: Response) => {
     if (!(await user.isValidPassword(password)))
       return res.status(401).json({ password: "Invalid password" });
 
-    const token = jwt.sign({ username }, process.env.JWT_SECRET, {
-      expiresIn: 60 * 60,
-    });
+    const token = jwt.sign({ username }, process.env.JWT_SECRET);
 
-    res.status(200).json({ user, token });
+    res.set(
+      "Set-Cookie",
+      cookie.serialize("token", token, {
+        httpOnly: true, // cant be accessed by javascript
+        secure: process.env.NODE_ENV === "production", // from https domain or not
+        path: "/", // to be available everywhere on our domain
+        sameSite: "strict",
+        maxAge: 60 * 60,
+      })
+    );
+
+    res.status(200).json(user);
   } catch (error) {
-    res.status(500).json(error);
+    res.status(401).json(error.message);
+  }
+};
+
+const me = async (req: Request, res: Response) => {
+  try {
+    const { token } = req.cookies;
+
+    if (!token) throw new Error("Unauthenticated");
+
+    const { username } = jwt.verify(token, process.env.JWT_SECRET) as any;
+    const user = await User.findOne({ username });
+
+    if (!user) throw new Error("Unauthenticated");
+
+    res.json(user);
+  } catch (error) {
+    res.status(401).json({ error: error.message });
   }
 };
 
 const router = Router();
 router.post("/register", register);
 router.post("/login", login);
+router.get("/me", me);
 
 export const authRoute = router;
