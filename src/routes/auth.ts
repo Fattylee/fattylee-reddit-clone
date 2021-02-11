@@ -3,6 +3,7 @@ import { Request, Response, Router } from "express";
 import jwt from "jsonwebtoken";
 import cookie from "cookie";
 import { User } from "../entity/User";
+import auth from "../middlewares/auth";
 
 const register = async (req: Request, res: Response) => {
   try {
@@ -68,25 +69,27 @@ const login = async (req: Request, res: Response) => {
 };
 
 const me = async (req: Request, res: Response) => {
-  try {
-    const { token } = req.cookies;
+  res.json(res.locals.user);
+};
 
-    if (!token) throw new Error("Unauthenticated");
-
-    const { username } = jwt.verify(token, process.env.JWT_SECRET) as any;
-    const user = await User.findOne({ username });
-
-    if (!user) throw new Error("Unauthenticated");
-
-    res.json(user);
-  } catch (error) {
-    res.status(401).json({ error: error.message });
-  }
+const logout = (req: Request, res: Response) => {
+  res.set(
+    "set-cookie",
+    cookie.serialize("token", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      sameSite: "strict",
+      expires: new Date(0),
+    })
+  );
+  res.json({ success: true });
 };
 
 const router = Router();
 router.post("/register", register);
 router.post("/login", login);
-router.get("/me", me);
+router.get("/me", auth, me);
+router.get("/logout", auth, logout);
 
 export const authRoute = router;
