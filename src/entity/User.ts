@@ -8,7 +8,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from "typeorm";
-import { hash } from "bcrypt";
+import { hash, compare } from "bcrypt";
 import { IsEmail, Length } from "class-validator";
 import { classToPlain, Exclude } from "class-transformer";
 
@@ -54,5 +54,9 @@ export class User extends BaseEntity {
   }
   toJSON() {
     return classToPlain(this);
+  }
+
+  isValidPassword(password: string) {
+    return compare(password, this.password);
   }
 }
